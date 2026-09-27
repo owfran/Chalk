@@ -1,0 +1,73 @@
+#npm run dev
+-----------------------------------------------------------------------------------------
+Which code runs on the server:
+app/ and lib/ seems to be where most to all of the real server side code runs. It is mostly files 
+for different pages such as login, or the main page. lib/ conatines important files for authentication.
+----------------------------------------------------------------------------------------
+Which code runs in the browser:
+After some research, searching the entire project for file starting with "use client";.
+This is normal for nodeJS to determine browser side code with this. It reminds me of
+how python files can be labeled as exectubale with #!
+
+The code that runs on the browser is frmo LogoutButton.js and PostBody.js and are the 
+only 2 files under components/
+Logoutbutton seems to use a generic button object as a way to logout.
+PostBody seems to disply htm feedback, but does not interact with the user.
+It has a possible hint to the exploit with a "dangerouslySetInnerHTML" varible.
+-----------------------------------------------------------------------------------------
+How a session cookie becomes `currentUser`:
+In lib/actions.js the currentUser function returns userFromToken(jar.get("chalk_session")?.value);
+This grabs a cookies called chalk-session from the user.
+Also the loginAction function is what retrives the cookie for a known user
+or creates a new cookie and session table in the DB for a new user.
+usersFromToken is where the cookie/token becomes the current user by creating a join
+between users and session tables based on the userID which is determined by the cookie value.
+------------------------------------------------------------------------------------------
+
+How a post body gets from the compose form onto the wall:
+The composePage function in app/compose/page.js displays a page to make a post and
+takes the user input and gives it to createPostAction. That funtion takes the data and adds it to 
+the database, which means it can be displayed.
+-------------------------------------------------------------------------------------------
+
+What an officer can see that a member cannot:
+The main page hides a button to the mod page where officers can manipulate th database.
+The mod page also enofrces that the user is signed in and an officers with user.role == officer. other wise theu are given an error.
+--------------------------------------------------------------------------------------------
+
+Then look for a security defect in the running system:
+mytestuser:
+test1@udel.edu    test1    test1000
+
+The post form allows the user to run input javascript that runs when someone visits the wall.
+------------------------------------------------------------------------------------------------------------
+
+Document how to trigger it:
+The post body:
+    "use client";
+
+    export default function PostBody({ html }) {
+        return <div className="post-body" dangerouslySetInnerHTML={{ __html: html }} />;
+    }
+
+
+has an unsanatized input that let any user post some kind of HTML or HTML containing javascript, such as plaintext or browser alerts.
+example of one that auto displays an alert:
+<img src="invalid" onerror="alert('hello world')">
+
+--------------------------------------------------------------------------------------------------------------
+
+How i fixed it:
+
+I added this function:
+    function cleanTheNasty(str) {
+        return str
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+that sanatizes escape characters.
+Then inside the createPostAction function, I call     const safe = cleanTheNasty(body);
+right before the line to add 'body' to the DB but instead it adds 'safe' to the DB so not the post displays text only.
